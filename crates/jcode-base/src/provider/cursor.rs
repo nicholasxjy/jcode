@@ -23,9 +23,11 @@ const MODELS_API_URL: &str = "https://api.cursor.com/v0/models";
 // Cursor deprecated `composer-1.5` ("no longer available; use Composer 2.5").
 // Default to a model Cursor currently serves; the live catalog overrides this
 // whenever it is reachable.
-const DEFAULT_MODEL: &str = "composer-2.5";
+const DEFAULT_MODEL: &str = "default";
 const MAX_PROMPT_CHARS: usize = 120_000;
 pub(crate) const AVAILABLE_MODELS: &[&str] = &[
+    "default",
+    "auto",
     "composer-2.5",
     "composer-2-fast",
     "composer-2",
