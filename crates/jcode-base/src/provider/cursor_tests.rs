@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn available_models_include_composer_models() {
-    let provider = CursorCliProvider::new();
+    let provider = CursorCliProvider::new_for_tests();
     let models = provider.available_models();
     assert!(models.contains(&"default"));
     assert!(models.contains(&"auto"));
@@ -12,7 +12,7 @@ fn available_models_include_composer_models() {
 
 #[test]
 fn available_models_display_keeps_default_first_when_dynamic_catalog_omits_it() {
-    let provider = CursorCliProvider::new();
+    let provider = CursorCliProvider::new_for_tests();
     *provider.fetched_models.write().unwrap() = vec![
         "claude-4-sonnet-thinking".to_string(),
         "composer-2.5".to_string(),
@@ -20,6 +20,7 @@ fn available_models_display_keeps_default_first_when_dynamic_catalog_omits_it() 
 
     let models = provider.available_models_display();
     assert_eq!(models.first().map(|model| model.as_str()), Some("default"));
+    assert_eq!(models.get(1).map(|model| model.as_str()), Some("auto"));
     assert!(
         models
             .iter()
@@ -29,7 +30,7 @@ fn available_models_display_keeps_default_first_when_dynamic_catalog_omits_it() 
 
 #[test]
 fn available_models_display_includes_custom_current_model() {
-    let provider = CursorCliProvider::new();
+    let provider = CursorCliProvider::new_for_tests();
     provider.set_model("future-cursor-model").unwrap();
 
     let models = provider.available_models_display();
@@ -38,7 +39,7 @@ fn available_models_display_includes_custom_current_model() {
 
 #[test]
 fn available_models_display_prefers_fetched_cursor_models() {
-    let provider = CursorCliProvider::new();
+    let provider = CursorCliProvider::new_for_tests();
     *provider.fetched_models.write().unwrap() = vec![
         "claude-4-sonnet-thinking".to_string(),
         "gpt-5.2".to_string(),
@@ -47,8 +48,15 @@ fn available_models_display_prefers_fetched_cursor_models() {
     let models = provider.available_models_display();
     assert_eq!(models.first().map(|model| model.as_str()), Some("default"));
     assert_eq!(
-        models.get(1).map(|model| model.as_str()),
+        models.get(2).map(|model| model.as_str()),
         Some("claude-4-sonnet-thinking")
+    );
+    assert_eq!(
+        models
+            .iter()
+            .filter(|model| model.as_str() == "auto")
+            .count(),
+        1
     );
     assert!(models.iter().any(|model| model == "gpt-5.2"));
     assert!(models.iter().any(|model| model == "composer-2.5"));
@@ -99,7 +107,7 @@ fn available_models_display_seeds_from_persisted_catalog() {
     )
     .expect("write persisted catalog");
 
-    let provider = CursorCliProvider::new();
+    let provider = CursorCliProvider::new_for_tests();
     assert!(
         provider
             .available_models_display()
@@ -115,7 +123,7 @@ fn available_models_display_seeds_from_persisted_catalog() {
 
 #[test]
 fn set_model_accepts_composer_models() {
-    let provider = CursorCliProvider::new();
+    let provider = CursorCliProvider::new_for_tests();
 
     provider.set_model("composer-2").unwrap();
     assert_eq!(provider.model(), "composer-2");

@@ -529,6 +529,8 @@ fn test_session_route_restore_request_matrix_preserves_runtime_identity() {
             Some("cursor"),
             "cursor:composer-2.5",
         ),
+        ("default", Some("cursor"), Some("cursor"), "cursor:default"),
+        ("auto", Some("cursor"), Some("cursor"), "cursor:auto"),
         (
             "anthropic.claude-3-5-sonnet-20241022-v2:0",
             Some("bedrock"),
@@ -1432,7 +1434,7 @@ fn test_provider_specific_model_prefix_cannot_bypass_provider_lock() {
                 copilot_api: RwLock::new(None),
                 antigravity: RwLock::new(None),
                 gemini: RwLock::new(None),
-                cursor: RwLock::new(Some(Arc::new(cursor::CursorCliProvider::new()))),
+                cursor: RwLock::new(Some(Arc::new(cursor::CursorCliProvider::new_for_tests()))),
                 bedrock: RwLock::new(None),
                 openrouter: RwLock::new(Some(openrouter)),
                 openai_compatible_profiles: RwLock::new(std::collections::HashMap::new()),
@@ -1455,6 +1457,43 @@ fn test_provider_specific_model_prefix_cannot_bypass_provider_lock() {
             assert_eq!(provider.active_provider(), ActiveProvider::OpenRouter);
         })
     });
+}
+
+#[test]
+fn test_cursor_default_and_auto_routes_are_selectable() {
+    let provider = test_multi_provider_with_cursor();
+
+    let routes = provider.model_routes();
+    assert!(
+        routes.iter().any(|route| {
+            route.model == "default" && route.provider == "Cursor" && route.api_method == "cursor"
+        }),
+        "Cursor default route should be present in model picker routes: {routes:?}"
+    );
+    assert!(
+        routes.iter().any(|route| {
+            route.model == "auto" && route.provider == "Cursor" && route.api_method == "cursor"
+        }),
+        "Cursor auto route should be present in model picker routes: {routes:?}"
+    );
+
+    provider
+        .set_model("cursor:default")
+        .expect("cursor default alias should be selectable");
+    assert_eq!(provider.active_provider(), ActiveProvider::Cursor);
+    assert_eq!(provider.model(), "default");
+
+    provider
+        .set_route_selection(&RouteSelection {
+            model: "auto".to_string(),
+            runtime_key: RuntimeKey::Cursor,
+            api_method: "cursor".to_string(),
+            provider_label: "Cursor".to_string(),
+            detail: String::new(),
+        })
+        .expect("cursor auto route should be selectable");
+    assert_eq!(provider.active_provider(), ActiveProvider::Cursor);
+    assert_eq!(provider.model(), "auto");
 }
 
 #[test]

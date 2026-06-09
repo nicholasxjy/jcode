@@ -653,7 +653,7 @@ fn test_multi_provider_with_cursor() -> MultiProvider {
         copilot_api: RwLock::new(None),
         antigravity: RwLock::new(None),
         gemini: RwLock::new(None),
-        cursor: RwLock::new(Some(Arc::new(cursor::CursorCliProvider::new()))),
+        cursor: RwLock::new(Some(Arc::new(cursor::CursorCliProvider::new_for_tests()))),
         bedrock: RwLock::new(None),
         openrouter: RwLock::new(None),
         openai_compatible_profiles: RwLock::new(std::collections::HashMap::new()),

@@ -24,6 +24,7 @@ const MODELS_API_URL: &str = "https://api.cursor.com/v0/models";
 // Default to a model Cursor currently serves; the live catalog overrides this
 // whenever it is reachable.
 const DEFAULT_MODEL: &str = "default";
+const AUTO_MODEL: &str = "auto";
 const MAX_PROMPT_CHARS: usize = 120_000;
 pub(crate) const AVAILABLE_MODELS: &[&str] = &[
     "default",
@@ -140,10 +141,10 @@ struct PersistedCatalog {
 fn merge_cursor_models(dynamic: &[String], current: &str) -> Vec<String> {
     let mut merged = Vec::new();
 
-    // Cursor's live catalog may omit the UI-level default alias. Keep it pinned
-    // at the top so users can always switch back to Cursor's automatic model
-    // selection even after a dynamic catalog refresh.
+    // Cursor's live catalog may omit UI-level automatic model aliases. Keep them
+    // pinned at the top so users can always switch back after a catalog refresh.
     merged.push(DEFAULT_MODEL.to_string());
+    merged.push(AUTO_MODEL.to_string());
 
     for model in dynamic {
         let trimmed = model.trim();
@@ -174,7 +175,7 @@ fn resolve_model_for_request(model: &str) -> &str {
         // selector. `default` is the stable jcode-facing alias shown in config and
         // the picker, but sending it literally leaves the backend on an unintended
         // model path.
-        "auto"
+        AUTO_MODEL
     } else {
         trimmed
     }
@@ -221,6 +222,17 @@ pub struct CursorCliProvider {
 }
 
 impl CursorCliProvider {
+    fn with_client(client: reqwest::Client) -> Self {
+        let model = std::env::var("JCODE_CURSOR_MODEL").unwrap_or_else(|_| DEFAULT_MODEL.into());
+        let provider = Self {
+            client,
+            model: Arc::new(RwLock::new(model)),
+            fetched_models: Arc::new(RwLock::new(Vec::new())),
+        };
+        provider.seed_cached_catalog();
+        provider
+    }
+
     fn persisted_catalog_path() -> Result<std::path::PathBuf> {
         Ok(crate::storage::app_config_dir()?.join("cursor_models_cache.json"))
     }
@@ -261,14 +273,16 @@ impl CursorCliProvider {
     }
 
     pub fn new() -> Self {
-        let model = std::env::var("JCODE_CURSOR_MODEL").unwrap_or_else(|_| DEFAULT_MODEL.into());
-        let provider = Self {
-            client: crate::provider::shared_http_client(),
-            model: Arc::new(RwLock::new(model)),
-            fetched_models: Arc::new(RwLock::new(Vec::new())),
-        };
-        provider.seed_cached_catalog();
-        provider
+        Self::with_client(crate::provider::shared_http_client())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new_for_tests() -> Self {
+        let client = reqwest::Client::builder()
+            .no_proxy()
+            .build()
+            .expect("test Cursor client");
+        Self::with_client(client)
     }
 }
 
