@@ -140,6 +140,11 @@ struct PersistedCatalog {
 fn merge_cursor_models(dynamic: &[String], current: &str) -> Vec<String> {
     let mut merged = Vec::new();
 
+    // Cursor's live catalog may omit the UI-level default alias. Keep it pinned
+    // at the top so users can always switch back to Cursor's automatic model
+    // selection even after a dynamic catalog refresh.
+    merged.push(DEFAULT_MODEL.to_string());
+
     for model in dynamic {
         let trimmed = model.trim();
         if !trimmed.is_empty() && !merged.iter().any(|known| known == trimmed) {
@@ -160,6 +165,19 @@ fn merge_cursor_models(dynamic: &[String], current: &str) -> Vec<String> {
     }
 
     merged
+}
+
+fn resolve_model_for_request(model: &str) -> &str {
+    let trimmed = model.trim();
+    if trimmed.is_empty() || trimmed == DEFAULT_MODEL {
+        // Cursor's native protobuf endpoint accepts `auto` as the automatic model
+        // selector. `default` is the stable jcode-facing alias shown in config and
+        // the picker, but sending it literally leaves the backend on an unintended
+        // model path.
+        "auto"
+    } else {
+        trimmed
+    }
 }
 
 async fn fetch_available_models(client: &reqwest::Client, api_key: &str) -> Result<Vec<String>> {
@@ -300,7 +318,8 @@ impl Provider for CursorCliProvider {
         let (tx, rx) = mpsc::channel::<Result<crate::message::StreamEvent>>(100);
 
         tokio::spawn(async move {
-            let result = run_native_text_command(client, tx.clone(), &prompt, &model).await;
+            let request_model = resolve_model_for_request(&model).to_string();
+            let result = run_native_text_command(client, tx.clone(), &prompt, &request_model).await;
 
             if let Err(err) = result {
                 let _ = tx.send(Err(err)).await;

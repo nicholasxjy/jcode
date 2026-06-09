@@ -4,8 +4,27 @@ use super::*;
 fn available_models_include_composer_models() {
     let provider = CursorCliProvider::new();
     let models = provider.available_models();
+    assert!(models.contains(&"default"));
+    assert!(models.contains(&"auto"));
     assert!(models.contains(&"composer-2"));
     assert!(models.contains(&"composer-2.5"));
+}
+
+#[test]
+fn available_models_display_keeps_default_first_when_dynamic_catalog_omits_it() {
+    let provider = CursorCliProvider::new();
+    *provider.fetched_models.write().unwrap() = vec![
+        "claude-4-sonnet-thinking".to_string(),
+        "composer-2.5".to_string(),
+    ];
+
+    let models = provider.available_models_display();
+    assert_eq!(models.first().map(|model| model.as_str()), Some("default"));
+    assert!(
+        models
+            .iter()
+            .any(|model| model == "claude-4-sonnet-thinking")
+    );
 }
 
 #[test]
@@ -26,8 +45,9 @@ fn available_models_display_prefers_fetched_cursor_models() {
     ];
 
     let models = provider.available_models_display();
+    assert_eq!(models.first().map(|model| model.as_str()), Some("default"));
     assert_eq!(
-        models.first().map(|model| model.as_str()),
+        models.get(1).map(|model| model.as_str()),
         Some("claude-4-sonnet-thinking")
     );
     assert!(models.iter().any(|model| model == "gpt-5.2"));
@@ -53,6 +73,13 @@ fn merge_cursor_models_deduplicates_dynamic_entries() {
         1
     );
     assert!(models.iter().any(|model| model == "composer-2"));
+}
+
+#[test]
+fn resolve_model_for_request_maps_default_alias_to_auto() {
+    assert_eq!(resolve_model_for_request("default"), "auto");
+    assert_eq!(resolve_model_for_request("  "), "auto");
+    assert_eq!(resolve_model_for_request("composer-2.5"), "composer-2.5");
 }
 
 #[test]
